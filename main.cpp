@@ -225,9 +225,10 @@ void output(int n_spins, int mcs, double temp, double *average, vector <double> 
   ofile << setw(15) << setprecision(8) << Mabsaverage/n_spins/n_spins << endl;
   */
 
+  //Writing E- and M-values to file:
   for (int i =0; i < mcs; i++){
-      ofile << E_vec[i] << endl;
-      ofile << absM_vec[i] << endl;
+      ofile << E_vec[i] << "  " << absM_vec[i] << endl; //1 column: E, 2 column: abs(M)
+      //ofile << absM_vec[i] << endl;
   }
 
 

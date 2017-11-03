@@ -16,14 +16,15 @@
 //argc (argument count) is the number of variables pointed to by argv (argument vector).
 //This will (in practice) be 1 plus the number of arguments. argv inneholder argumentene.
 
-//Results with mcs = 1000000: Eavg = 1.61061e9, mcs = 10000000: Eavg = -6.0398e8, mcs =10000000: Eavg = -1.00663e9
-//mcs = 1000000000: Eavg = 1.40929e9, mcs = 2000000000, Eavg = -0.999329
+//Results with mcs = 100000: Eavg = -1.99918, mcs = 1000000: Eavg = -1.99932 og Mavg = 0.999846, mcs = 10000000: Eavg = -1.99934, mcs = 100000000: Eavg = -1.99933
+//mcs = 1000000000: Eavg = -1.99933.
 
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <cmath>
 #include <random>
+#include <vector>
 //#include "lib.h"
 using namespace std;
 ofstream ofile;
@@ -35,45 +36,66 @@ inline int periodic(int i, int limit, int add){
 
 //Prototyping functions:
 
+double analyticEavg(double, double);
+double analyticE2avg(double, double);
+double analyticMavg(double, double);
+double analyticM2avg(double, double);
+double analyticSusceptibility(double, double, double);
+double analyticHeatCapacity(double, double, double);
+
 // Function to read in data from screen
 void read_input(int&, int&, double&, double&, double&); //Bruker ikke denne
 
 void initialize(int n_spins, double temp, int **spin_matrix, double &E, double &M);
 
-void Metropolis(int, long&, int**, double&, double&, double *);
+void Metropolis(int, int**, double&, double&, double *);
 
 // prints to file the results of the calculations
-void output(int, int, double, double *);
+void output(int, int, double, double *, vector <double>);
 
 random_device rd;
 mt19937 engine(rd());
-uniform_real_distribution <double> randd(0., 1.0);
+uniform_real_distribution <double> randd(0.0, 1.0);
 
 //Random numbers:
 double rrandom(){
     return randd(engine);
 }
 
-double r = rrandom();
-
 //main program:
 int main(){
-    cout << "Random number: " << r << endl;
 
     //char *outfilename;
-    long idum;
-    double temp = 1.; //Litt usikker paa om riktig
+    double temp = 1.;
     double initial_temp = 1.;
     double final_temp = 3.;
     double temp_step = 0.2;
+    double beta = 1./temp;  //1/kT med k=1
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
     int n_spins = 2; //Antall spins i én retning
-    int mcs = 2000000000; //antall monte carlo cycles should be a billion?
+    int mcs = 10000000; //antall monte carlo cycles should be a billion?
     double w[17], average[5], E, M;
+    double Z = 12 + 2*exp(8*beta) + 2*exp(-8*beta); //For 2x2-lattice
+    vector <double> E_vec(mcs);
 
     int** spin_matrix = new int*[n_spins]; //Deklarerer matrisen spin_matrix
     for(int i = 0; i < n_spins; i++)
         spin_matrix[i] = new int[n_spins];
+
+    //Analytisk forventningsverdi av energi og magnetisering:
+    double analytic_Eavg = analyticEavg(Z, beta); //function call
+    double analytic_E2avg = analyticE2avg(Z, beta);
+    double analytic_Mavg = analyticMavg(Z, beta);
+    double analytic_M2avg = analyticM2avg(Z, beta);
+    double analytic_Susceptibility = analyticSusceptibility(analytic_Mavg, analytic_M2avg, temp);
+    double analytic_HeatCapacity = analyticHeatCapacity(analytic_Eavg, analytic_E2avg, temp);
+
+    cout << "Analytical expectation value of energy: " << analytic_Eavg/n_spins/n_spins << endl; //Eavg/n_spins/n_spins
+    cout << "Analytical expectation value of energy^2: " << analytic_E2avg/n_spins/n_spins << endl; //Eavg/n_spins/n_spins
+    cout << "Analytical expectation value of magnetization: " << analytic_Mavg/n_spins/n_spins << endl; //Mavg/n_spins/n_spins
+    cout << "Analytical expectation value of magnetization^2: " << analytic_M2avg/n_spins/n_spins << endl; //Mavg/n_spins/n_spins
+    cout << "Analytical susceptibility: " << analytic_Susceptibility << endl;
+    cout << "Analytical heat capacity: " << analytic_HeatCapacity << endl;
 
     /*
     // Read in output file, abort if there are too few command-line arguments
@@ -92,7 +114,6 @@ int main(){
       //Read in initial values such as size of lattice, temp and cycles
       //read_input(n_spins, mcs, initial_temp, final_temp, temp_step);  //Command line arguments
 
-    idum = -1; //random starting point
     for (double temp = initial_temp; temp <= final_temp; temp += temp_step){
         E = M = 0; //Initialize energy and magnetization
     }
@@ -105,17 +126,21 @@ int main(){
     //Initialize array for expectation values:
     for (int i = 0; i < 5; i++) average[i] = 0.; //Setter alle elementer lik null. [E, E^2, M, M^2, abs(M)]
 
+
+
     initialize(n_spins, temp, spin_matrix, E, M); //Kaller initialize
     //Start Monte Carlo computation:
     for (int cycles = 1; cycles <= mcs; cycles++){
-        Metropolis(n_spins, idum, spin_matrix, E, M, w);
+        Metropolis(n_spins, spin_matrix, E, M, w);
         //Update expectation values:
-        average[0] += E; average[1] += E*E;
+        average[0] += E; average[1] += E*E;  //average is expectation values. I c) vil jeg plotte E jeg faar etter hver sweep gjennom lattice mot mcs
         average[2] += M; average[3] += M*M; average[4] += fabs(M);
+        E_vec[cycles] = E;  //Inneholder E-verdiene jeg skal plotte. Antall E-verdier vil vaere lik mcs.
+        //cout << E_vec[cycles] << endl;
     }
 
     //Print results:
-    output(n_spins, mcs, temp, average); //temp er kalt temperature i Mortens program
+    output(n_spins, mcs, temp, average, E_vec); //temp er kalt temperature i Mortens program
 
     //free_matrix((void **) spin_matrix ); //free memory
     ofile.close(); //close output file
@@ -135,12 +160,24 @@ void initialize(int n_spins, double temp, int **spin_matrix, double& E, double& 
     //Setup for spin matrix and initial magnetization
     for (int y = 0; y < n_spins; y++){
         for (int x = 0; x < n_spins; x++){
-            if (temp < 1.5) spin_matrix[y][x] = 1; //Spin orientation for the ground state. Sets ll spins = 1 if temp is low (T<1.5).
+            //if (temp < 1.5) spin_matrix[y][x] = 1; //Spin orientation for the ground state. Sets ll spins = 1 if temp is low (T<1.5).
+
+            //Random start congif:
+            double r = rrandom();
+            if (r <= 0.5) spin_matrix[y][x] = -1;
+            else{
+                spin_matrix[y][x] = 1;
+            }
+
             M += (double) spin_matrix[y][x]; //Initialize magnetization M
-            E -= (double) spin_matrix[y][x] * (spin_matrix[periodic(y, n_spins, -1)][x] + spin_matrix[y][periodic(x, n_spins, -1)] );
         }
     }
 
+    for (int y = 0; y < n_spins; y++){
+        for (int x = 0; x < n_spins; x++){
+            E -= (double) spin_matrix[y][x] * (spin_matrix[periodic(y, n_spins, -1)][x] + spin_matrix[y][periodic(x, n_spins, -1)] );
+        }
+    }
 }//End function initialize
 /*
 // read in input data
@@ -161,7 +198,8 @@ void read_input(int& n_spins, int& mcs, double& initial_temp,
 } // end of function read_input
 */
 
-void output(int n_spins, int mcs, double temp, double *average)
+//Calculates and prints numerical values:
+void output(int n_spins, int mcs, double temp, double *average, vector <double> E_vec)
 {
   double norm = 1/((double) (mcs));  // divided by total number of cycles
   double Eaverage = average[0]*norm;
@@ -169,6 +207,8 @@ void output(int n_spins, int mcs, double temp, double *average)
   double Maverage = average[2]*norm;
   double M2average = average[3]*norm;
   double Mabsaverage = average[4]*norm;
+  double num_HeatCapacity = (E2average - Eaverage*Eaverage)/(temp*temp);
+  double num_Susceptibility = (M2average - Mabsaverage*Mabsaverage)/((double) temp);
   // all expectation values are per spin, divide by 1/n_spins/n_spins
   double Evariance = (E2average- Eaverage*Eaverage)/n_spins/n_spins;
   double Mvariance = (M2average - Mabsaverage*Mabsaverage)/n_spins/n_spins;
@@ -179,19 +219,25 @@ void output(int n_spins, int mcs, double temp, double *average)
   ofile << setw(15) << setprecision(8) << Maverage/n_spins/n_spins; //4 kolonne
   ofile << setw(15) << setprecision(8) << Mvariance/temp; //5 kolonne
   ofile << setw(15) << setprecision(8) << Mabsaverage/n_spins/n_spins << endl; //6 kolonne
+  ofile << setw(15) << setprecision(8) << Mabsaverage/n_spins/n_spins << endl;
 
-  cout << "E average: " << Eaverage/n_spins/n_spins << endl;
+  cout << "Numerical E average: " << Eaverage/n_spins/n_spins << endl;
+  cout << "Numerical abs M average: " << Mabsaverage/n_spins/n_spins << endl;
+  cout << "Numerical E^2 average: " << E2average/n_spins/n_spins << endl;
+  cout << "Numerical M^2 average: " << M2average/n_spins/n_spins << endl;
+  cout << "Numerical heat capacity: " << num_HeatCapacity << endl;
+  cout << "Numerical susceptibility: " << num_Susceptibility << endl;
 
 } // end output function
 
 //Function that performs the Metropolis algo:
-void Metropolis(int n_spins, long & idum, int **spin_matrix, double & E, double & M, double *w){
+void Metropolis(int n_spins, int **spin_matrix, double & E, double & M, double *w){
     //Loop over all spins:
     for (int y = 0; y < n_spins; y++){
         for (int x = 0; x < n_spins; x++){
             //find random position:
-            int ix = (int) (rrandom()) * n_spins;
-            int iy = (int) (rrandom()) * n_spins;
+            int ix = (int) (rrandom() * n_spins);
+            int iy = (int) (rrandom() * n_spins);
             //Calculate energy difference: (likn 13.6 i forel notater)
             int deltaE = 2*spin_matrix[iy][ix] *
             (spin_matrix[iy][periodic(ix, n_spins, -1)] +
@@ -209,3 +255,39 @@ void Metropolis(int n_spins, long & idum, int **spin_matrix, double & E, double 
         }
     }
 }//End Metropolis function (Metropolis sampling over spins)
+
+//Function that calculates analytic average energy
+double analyticEavg(double Z, double beta){
+    double analytic_Eavg = (16*exp(-8*beta) - 16*exp(8*beta))/Z;
+    return analytic_Eavg; //Skal bli ca -2
+}
+
+//Function that calculates analytic average magnetization
+double analyticMavg(double Z, double beta){
+    double analytic_Mavg = (8*exp(8*beta) + 16)/Z;
+    return analytic_Mavg; //Skal bli ca
+}
+
+//Function that calculates analytic average energy squared
+double analyticE2avg(double Z, double beta){
+    double analytic_E2avg = 256*cosh(8*beta)/Z;
+    return analytic_E2avg;
+}
+
+//Function that calculates analytic average magnetization squared:
+double analyticM2avg(double Z, double beta){
+    double analytic_M2avg = (32 + 32*exp(8*beta))/Z;
+    return analytic_M2avg;
+}
+
+double analyticSusceptibility(double analytic_Mavg, double analytic_M2avg, double temp){
+    //double analytical_Susceptibility = 1/temp*( (32 + +32*exp(8*beta))/Z - pow( 16 + 8*exp(8*beta), 2 )/(Z*Z) );
+    double analytic_Susceptibility = (analytic_M2avg - analytic_Mavg*analytic_Mavg)/temp;
+    return analytic_Susceptibility;
+}
+
+double analyticHeatCapacity(double analytic_Eavg, double analytic_E2avg, double temp){
+    double analytic_Heat_Capacity = (analytic_E2avg - analytic_Eavg*analytic_Eavg)/(temp*temp);
+    return analytic_Heat_Capacity;
+}
+

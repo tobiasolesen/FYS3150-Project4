@@ -51,7 +51,7 @@ void initialize(int n_spins, double temp, int **spin_matrix, double &E, double &
 void Metropolis(int, int**, double&, double&, double *);
 
 // prints to file the results of the calculations
-void output(int, int, double, double *, vector <double>);
+void output(int, int, double, double *, vector <double>, vector <double>);
 
 random_device rd;
 mt19937 engine(rd());
@@ -73,10 +73,11 @@ int main(){
     double beta = 1./temp;  //1/kT med k=1
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
     int n_spins = 2; //Antall spins i én retning
-    int mcs = 10000000; //antall monte carlo cycles should be a billion?
+    int mcs = 1000000; //antall monte carlo cycles should be a billion?
     double w[17], average[5], E, M;
     double Z = 12 + 2*exp(8*beta) + 2*exp(-8*beta); //For 2x2-lattice
     vector <double> E_vec(mcs);
+    vector <double> absM_vec(mcs);
 
     int** spin_matrix = new int*[n_spins]; //Deklarerer matrisen spin_matrix
     for(int i = 0; i < n_spins; i++)
@@ -136,11 +137,12 @@ int main(){
         average[0] += E; average[1] += E*E;  //average is expectation values. I c) vil jeg plotte E jeg faar etter hver sweep gjennom lattice mot mcs
         average[2] += M; average[3] += M*M; average[4] += fabs(M);
         E_vec[cycles] = E;  //Inneholder E-verdiene jeg skal plotte. Antall E-verdier vil vaere lik mcs.
+        absM_vec[cycles] = fabs(M);
         //cout << E_vec[cycles] << endl;
     }
 
     //Print results:
-    output(n_spins, mcs, temp, average, E_vec); //temp er kalt temperature i Mortens program
+    output(n_spins, mcs, temp, average, E_vec, absM_vec); //temp er kalt temperature i Mortens program
 
     //free_matrix((void **) spin_matrix ); //free memory
     ofile.close(); //close output file
@@ -199,7 +201,7 @@ void read_input(int& n_spins, int& mcs, double& initial_temp,
 */
 
 //Calculates and prints numerical values:
-void output(int n_spins, int mcs, double temp, double *average, vector <double> E_vec)
+void output(int n_spins, int mcs, double temp, double *average, vector <double> E_vec, vector <double> absM_vec)
 {
   double norm = 1/((double) (mcs));  // divided by total number of cycles
   double Eaverage = average[0]*norm;
@@ -213,6 +215,7 @@ void output(int n_spins, int mcs, double temp, double *average, vector <double> 
   double Evariance = (E2average- Eaverage*Eaverage)/n_spins/n_spins;
   double Mvariance = (M2average - Mabsaverage*Mabsaverage)/n_spins/n_spins;
   ofile << setiosflags(ios::showpoint | ios::uppercase);
+  /*
   ofile << setw(15) << setprecision(8) << temp; //1 kolonne i filen output.txt
   ofile << setw(15) << setprecision(8) << Eaverage/n_spins/n_spins; //2 kolonne
   ofile << setw(15) << setprecision(8) << Evariance/temp/temp; //3 kolonne
@@ -220,6 +223,13 @@ void output(int n_spins, int mcs, double temp, double *average, vector <double> 
   ofile << setw(15) << setprecision(8) << Mvariance/temp; //5 kolonne
   ofile << setw(15) << setprecision(8) << Mabsaverage/n_spins/n_spins << endl; //6 kolonne
   ofile << setw(15) << setprecision(8) << Mabsaverage/n_spins/n_spins << endl;
+  */
+
+  for (int i =0; i < mcs; i++){
+      ofile << E_vec[i] << endl;
+      ofile << absM_vec[i] << endl;
+  }
+
 
   cout << "Numerical E average: " << Eaverage/n_spins/n_spins << endl;
   cout << "Numerical abs M average: " << Mabsaverage/n_spins/n_spins << endl;

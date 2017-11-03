@@ -16,6 +16,9 @@
 //argc (argument count) is the number of variables pointed to by argv (argument vector).
 //This will (in practice) be 1 plus the number of arguments. argv inneholder argumentene.
 
+//Results with mcs = 1000000: Eavg = 1.61061e9, mcs = 10000000: Eavg = -6.0398e8, mcs =10000000: Eavg = -1.00663e9
+//mcs = 1000000000: Eavg = 1.40929e9, mcs = 2000000000, Eavg = -0.999329
+
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -55,7 +58,7 @@ double r = rrandom();
 
 //main program:
 int main(){
-    cout << r << endl;
+    cout << "Random number: " << r << endl;
 
     //char *outfilename;
     long idum;
@@ -65,7 +68,7 @@ int main(){
     double temp_step = 0.2;
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
     int n_spins = 2; //Antall spins i én retning
-    int mcs = 10; //antall monte carlo cycles should be a billion?
+    int mcs = 2000000000; //antall monte carlo cycles should be a billion?
     double w[17], average[5], E, M;
 
     int** spin_matrix = new int*[n_spins]; //Deklarerer matrisen spin_matrix
@@ -116,6 +119,11 @@ int main(){
 
     //free_matrix((void **) spin_matrix ); //free memory
     ofile.close(); //close output file
+
+    //Skriver ut:
+    cout << "Temperatur: " << temp << endl;
+    cout << "Antall Monte Carlo cycles: " << mcs << endl;
+
     return 0;
 
 }//End main
@@ -171,6 +179,9 @@ void output(int n_spins, int mcs, double temp, double *average)
   ofile << setw(15) << setprecision(8) << Maverage/n_spins/n_spins; //4 kolonne
   ofile << setw(15) << setprecision(8) << Mvariance/temp; //5 kolonne
   ofile << setw(15) << setprecision(8) << Mabsaverage/n_spins/n_spins << endl; //6 kolonne
+
+  cout << "E average: " << Eaverage/n_spins/n_spins << endl;
+
 } // end output function
 
 //Function that performs the Metropolis algo:
@@ -198,5 +209,3 @@ void Metropolis(int n_spins, long & idum, int **spin_matrix, double & E, double 
         }
     }
 }//End Metropolis function (Metropolis sampling over spins)
-
-

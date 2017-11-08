@@ -19,6 +19,11 @@
 //Results with mcs = 100000: Eavg = -1.99918, mcs = 1000000: Eavg = -1.99932 og Mavg = 0.999846, mcs = 10000000: Eavg = -1.99934, mcs = 100000000: Eavg = -1.99933
 //mcs = 1000000000: Eavg = -1.99933.
 
+// 4 d): Sannsynlighet for tilstand i (med tilhorende energi E_i): P(i) = 1/Z * e^(-E_i*beta)
+//Hvor Z = summen av boltzmanns faktorene (summen gaar over alle tilstander) = sum( exp( -E_i * beta) )
+//MPI: linje 26, 76-78, 122-125,
+
+//#include "mpi.h"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -48,10 +53,12 @@ void read_input(int&, int&, double&, double&, double&); //Bruker ikke denne
 
 void initialize(int n_spins, double temp, int **spin_matrix, double &E, double &M);
 
-void Metropolis(int, int**, double&, double&, double *);
+void Metropolis(int, int&, int**, double&, double&, double *, vector <int>);
 
 // prints to file the results of the calculations
 void output(int, int, double, double *, vector <double>, vector <double>);
+
+int accepted_configs = 0;
 
 random_device rd;
 mt19937 engine(rd());
@@ -65,6 +72,11 @@ double rrandom(){
 //main program:
 int main(){
 
+    //  MPI initializations
+    //MPI_Init (&argc, &argv);
+    //MPI_Comm_size (MPI_COMM_WORLD, &numprocs);
+    //MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
+
     //char *outfilename;
     double temp = 1.;
     double initial_temp = 1.;
@@ -72,12 +84,15 @@ int main(){
     double temp_step = 0.2;
     double beta = 1./temp;  //1/kT med k=1
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
-    int n_spins = 2; //Antall spins i én retning
-    int mcs = 1000000; //antall monte carlo cycles should be a billion?
-    double w[17], average[5], E, M;
+    int n_spins = 20; //Antall spins i én retning
+    //int accepted_configs = 0;
+    cout << "Spins in each direction: " << n_spins << endl;
+    int mcs = 50; //antall monte carlo cycles should be a billion?
+    double w[17], average[5], E, M; //w inneholder dE-verdier, average er forventningsverdiene
     double Z = 12 + 2*exp(8*beta) + 2*exp(-8*beta); //For 2x2-lattice
     vector <double> E_vec(mcs);
     vector <double> absM_vec(mcs);
+    vector <int> accepted_configs_vec(mcs);
 
     int** spin_matrix = new int*[n_spins]; //Deklarerer matrisen spin_matrix
     for(int i = 0; i < n_spins; i++)
@@ -98,22 +113,19 @@ int main(){
     cout << "Analytical susceptibility: " << analytic_Susceptibility << endl;
     cout << "Analytical heat capacity: " << analytic_HeatCapacity << endl;
 
-    /*
-    // Read in output file, abort if there are too few command-line arguments
-      if( argc <= 1 ){
-        cout << "Bad Usage: " << argv[0] <<
-          " read also output file on same line" << endl;
-        exit(1);
-      }
-      else{
-        //outfilename=argv[1];
-        outfilename = "output.txt";
-      }
-      */
-      //outfilename = "output.txt";
-      ofile.open("output.txt");
-      //Read in initial values such as size of lattice, temp and cycles
-      //read_input(n_spins, mcs, initial_temp, final_temp, temp_step);  //Command line arguments
+
+    //outfilename = "output.txt";
+    //Open file for writing
+    ofile.open("output.txt");
+
+    // broadcast to all nodes common variables
+    //MPI_Bcast (&n_spins, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    //MPI_Bcast (&initial_temp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //MPI_Bcast (&final_temp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //MPI_Bcast (&temp_step, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    double TimeStart, TimeEnd, TotalTime;
+    //TimeStart = MPI_Wtime();
 
     for (double temp = initial_temp; temp <= final_temp; temp += temp_step){
         E = M = 0; //Initialize energy and magnetization
@@ -132,7 +144,7 @@ int main(){
     initialize(n_spins, temp, spin_matrix, E, M); //Kaller initialize
     //Start Monte Carlo computation:
     for (int cycles = 1; cycles <= mcs; cycles++){
-        Metropolis(n_spins, spin_matrix, E, M, w);
+        Metropolis(n_spins, accepted_configs, spin_matrix, E, M, w, accepted_configs_vec);
         //Update expectation values:
         average[0] += E; average[1] += E*E;  //average is expectation values. I c) vil jeg plotte E jeg faar etter hver sweep gjennom lattice mot mcs
         average[2] += M; average[3] += M*M; average[4] += fabs(M);
@@ -150,6 +162,7 @@ int main(){
     //Skriver ut:
     cout << "Temperatur: " << temp << endl;
     cout << "Antall Monte Carlo cycles: " << mcs << endl;
+    cout << "Antall aksepterte konfigs: " << accepted_configs << endl;
 
     return 0;
 
@@ -162,7 +175,7 @@ void initialize(int n_spins, double temp, int **spin_matrix, double& E, double& 
     //Setup for spin matrix and initial magnetization
     for (int y = 0; y < n_spins; y++){
         for (int x = 0; x < n_spins; x++){
-            //if (temp < 1.5) spin_matrix[y][x] = 1; //Spin orientation for the ground state. Sets ll spins = 1 if temp is low (T<1.5).
+            //if (temp < 1.5) spin_matrix[y][x] = 1; //Spin orientation for the ground state. Sets all spins = 1 if temp is low (T<1.5).
 
             //Random start congif:
             double r = rrandom();
@@ -231,25 +244,26 @@ void output(int n_spins, int mcs, double temp, double *average, vector <double> 
       //ofile << absM_vec[i] << endl;
   }
 
-
   cout << "Numerical E average: " << Eaverage/n_spins/n_spins << endl;
   cout << "Numerical abs M average: " << Mabsaverage/n_spins/n_spins << endl;
   cout << "Numerical E^2 average: " << E2average/n_spins/n_spins << endl;
   cout << "Numerical M^2 average: " << M2average/n_spins/n_spins << endl;
   cout << "Numerical heat capacity: " << num_HeatCapacity << endl;
   cout << "Numerical susceptibility: " << num_Susceptibility << endl;
+  cout << "Numerical E variance: " << Evariance << endl;
 
 } // end output function
 
 //Function that performs the Metropolis algo:
-void Metropolis(int n_spins, int **spin_matrix, double & E, double & M, double *w){
+void Metropolis(int n_spins, int& accepted_configs, int **spin_matrix, double & E, double & M, double *w, vector <int> accepted_configs_vec){
+    int count = 0;
     //Loop over all spins:
     for (int y = 0; y < n_spins; y++){
         for (int x = 0; x < n_spins; x++){
             //find random position:
-            int ix = (int) (rrandom() * n_spins);
+            int ix = (int) (rrandom() * n_spins); //Random x and y which means a random spin is picked
             int iy = (int) (rrandom() * n_spins);
-            //Calculate energy difference: (likn 13.6 i forel notater)
+            //Calculate energy difference: (likn 13.6 i forel notater) of this spin
             int deltaE = 2*spin_matrix[iy][ix] *
             (spin_matrix[iy][periodic(ix, n_spins, -1)] +
             spin_matrix[periodic(iy, n_spins, -1)][ix] +
@@ -262,9 +276,14 @@ void Metropolis(int n_spins, int **spin_matrix, double & E, double & M, double *
                 //Update energy and magnetization:
                 M += (double) 2*spin_matrix[iy][ix];
                 E += (double) deltaE;
+                accepted_configs += 1; //Counts the accepted configs
+                //count += 1;
+                accepted_configs_vec[count] = accepted_configs;
+
             }
         }
     }
+    count +=1;
 }//End Metropolis function (Metropolis sampling over spins)
 
 //Function that calculates analytic average energy
@@ -301,4 +320,3 @@ double analyticHeatCapacity(double analytic_Eavg, double analytic_E2avg, double 
     double analytic_Heat_Capacity = (analytic_E2avg - analytic_Eavg*analytic_Eavg)/(temp*temp);
     return analytic_Heat_Capacity;
 }
-

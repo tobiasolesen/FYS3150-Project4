@@ -23,7 +23,9 @@
 //Hvor Z = summen av boltzmanns faktorene (summen gaar over alle tilstander) = sum( exp( -E_i * beta) )
 //MPI: linje 26, 76-78, 122-125,
 
-//#include "mpi.h"
+//cmnd A, cmnd i, for aa fikse indetering paa curly brackets
+
+#include "mpi.h"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -57,7 +59,7 @@ void initialize(int n_spins, double temp, int **spin_matrix, double &E, double &
 void Metropolis(int, int&, int**, double&, double&, double *, vector <int>&, int&);
 
 // prints to file the results of the calculations
-void output(int, int, double, double *, vector <double>, vector <double>);
+void output(int, int, double, double *, double *, vector <double>, vector <double>);
 
 int accepted_configs = 0;
 
@@ -70,28 +72,31 @@ double rrandom(){
     return randd(engine);
 }
 
+int my_rank;
+int numprocs;
+
 //main program:
-int main(){
+int main(int argc, char* argv[]){
 
-    //  MPI initializations
-    //MPI_Init (&argc, &argv);
-    //MPI_Comm_size (MPI_COMM_WORLD, &numprocs);
-    //MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
+    //MPI initializations
+    MPI_Init (&argc, &argv);
+    MPI_Comm_size (MPI_COMM_WORLD, &numprocs);
+    MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
 
-    //char *outfilename;
+    char *outfilename;
     double k = 1;
     double temp = 1.;
-    double initial_temp = 1.;
-    double final_temp = 3.;
-    double temp_step = 0.2;
+    double initial_temp = 2.;
+    double final_temp = 2.3;
+    double temp_step = 0.05;
     double beta = 1./(k*temp);  //1/kT med k=1
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
     int n_spins = 20; //Antall spins i én retning
     int accepted_configs = 0;
-    cout << "Spins in each direction: " << n_spins << endl;
     int mcs = 100000; //antall monte carlo cycles should be a billion?
     int mc_counter = 0;
-    double w[17], average[5], E, M; //w inneholder dE-verdier, average er forventningsverdiene
+    //int my_rank, numprocs;
+    double w[17], average[5], total_average[5], E, M; //w inneholder dE-verdier, average er forventningsverdiene
     double Z = 12 + 2*exp(8*beta) + 2*exp(-8*beta); //For 2x2-lattice
     int multiplicity = pow(2, (n_spins*n_spins));
     vector <double> E_vec(mcs);
@@ -102,31 +107,16 @@ int main(){
     for(int i = 0; i < n_spins; i++)
         spin_matrix[i] = new int[n_spins];
 
-    //Analytisk forventningsverdi av energi og magnetisering:
-    double analytic_Eavg = analyticEavg(Z, beta); //function call
-    double analytic_E2avg = analyticE2avg(Z, beta);
-    double analytic_Mavg = analyticMavg(Z, beta);
-    double analytic_M2avg = analyticM2avg(Z, beta);
-    double analytic_Susceptibility = analyticSusceptibility(analytic_Mavg, analytic_M2avg, temp);
-    double analytic_HeatCapacity = analyticHeatCapacity(analytic_Eavg, analytic_E2avg, temp);
-
-    cout << "Analytical expectation value of energy: " << analytic_Eavg/n_spins/n_spins << endl; //Eavg/n_spins/n_spins
-    cout << "Analytical expectation value of energy^2: " << analytic_E2avg/n_spins/n_spins << endl; //Eavg/n_spins/n_spins
-    cout << "Analytical expectation value of magnetization: " << analytic_Mavg/n_spins/n_spins << endl; //Mavg/n_spins/n_spins
-    cout << "Analytical expectation value of magnetization^2: " << analytic_M2avg/n_spins/n_spins << endl; //Mavg/n_spins/n_spins
-    cout << "Analytical susceptibility: " << analytic_Susceptibility << endl;
-    cout << "Analytical heat capacity: " << analytic_HeatCapacity << endl;
-
     //outfilename = "output.txt";
     //Open file for writing
     ofile.open("output.txt"); //File for energy and magnetization
     outfile.open("configs.txt"); //File for number of accepted configs
 
     // broadcast to all nodes common variables
-    //MPI_Bcast (&n_spins, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    //MPI_Bcast (&initial_temp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    //MPI_Bcast (&final_temp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    //MPI_Bcast (&temp_step, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast (&n_spins, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast (&initial_temp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast (&final_temp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast (&temp_step, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     double TimeStart, TimeEnd, TotalTime;
     //TimeStart = MPI_Wtime();
@@ -155,23 +145,56 @@ int main(){
         //cout << E_vec[cycles] << endl;
     }
 
-    cout << endl;
+    //Find total average
+    for( int i =0; i < 5; i++){
+        MPI_Reduce(&average[i], &total_average[i], 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    }
+
+    //print results:
+    if ( my_rank == 0) {
+        output(n_spins, mcs, temp, average, total_average, E_vec, absM_vec); //temp er kalt temperature i Mortens program
+    }
 
     for (int i=0; i < mcs; i++){
         outfile << accepted_configs_vec[i] << endl; //Writing number of accepted configs to file
     }
 
     //Print results:
-    output(n_spins, mcs, temp, average, E_vec, absM_vec); //temp er kalt temperature i Mortens program
+    //output(n_spins, mcs, temp, average, E_vec, absM_vec); //temp er kalt temperature i Mortens program
 
     //free_matrix((void **) spin_matrix ); //free memory
     ofile.close(); //close output file (inneholder energier + magnetisering)
     outfile.close(); //contains number of accepted configs
 
+    //TimeEnd = MPI_Wtime;
+    //TotalTime = TimeEnd - TimeStart;
+
+    //End MPI
+    MPI_Finalize();
 
     //Skriver ut:
-    cout << "Temperatur: " << temp << endl;
-    cout << "Antall Monte Carlo cycles: " << mcs << endl;
+    if (my_rank == 0){
+        cout << "Temperatur: " << temp << endl;
+        cout << "Antall Monte Carlo cycles: " << mcs << endl;
+        cout << "Spins in each direction: " << n_spins << endl;
+        cout << "Number of processors: " << numprocs << endl;
+
+        //Analytisk forventningsverdi av energi og magnetisering:
+        double analytic_Eavg = analyticEavg(Z, beta); //function call
+        double analytic_E2avg = analyticE2avg(Z, beta);
+        double analytic_Mavg = analyticMavg(Z, beta);
+        double analytic_M2avg = analyticM2avg(Z, beta);
+        double analytic_Susceptibility = analyticSusceptibility(analytic_Mavg, analytic_M2avg, temp);
+        double analytic_HeatCapacity = analyticHeatCapacity(analytic_Eavg, analytic_E2avg, temp);
+
+        //Skriver ut analytiske verdier:
+        cout << "Analytical expectation value of energy: " << analytic_Eavg/n_spins/n_spins << endl; //Eavg/n_spins/n_spins
+        cout << "Analytical expectation value of energy^2: " << analytic_E2avg/n_spins/n_spins << endl; //Eavg/n_spins/n_spins
+        cout << "Analytical expectation value of magnetization: " << analytic_Mavg/n_spins/n_spins << endl; //Mavg/n_spins/n_spins
+        cout << "Analytical expectation value of magnetization^2: " << analytic_M2avg/n_spins/n_spins << endl; //Mavg/n_spins/n_spins
+        cout << "Analytical susceptibility: " << analytic_Susceptibility << endl;
+        cout << "Analytical heat capacity: " << analytic_HeatCapacity << endl;
+    }
 
     return 0;
 
@@ -205,14 +228,14 @@ void initialize(int n_spins, double temp, int **spin_matrix, double& E, double& 
 }//End function initialize
 
 //Calculates and prints numerical values:
-void output(int n_spins, int mcs, double temp, double *average, vector <double> E_vec, vector <double> absM_vec)
+void output(int n_spins, int mcs, double temp, double *average, double *total_average, vector <double> E_vec, vector <double> absM_vec)
 {
-  double norm = 1/((double) (mcs));  // divided by total number of cycles
-  double Eaverage = average[0]*norm;
-  double E2average = average[1]*norm; //average of E^2
-  double Maverage = average[2]*norm;
-  double M2average = average[3]*norm;
-  double Mabsaverage = average[4]*norm;
+  double norm = 1/((double) (mcs)*4);  // divided by total number of cycles
+  double Eaverage = total_average[0]*norm;
+  double E2average = total_average[1]*norm; //average of E^2
+  double Maverage = total_average[2]*norm;
+  double M2average = total_average[3]*norm;
+  double Mabsaverage = total_average[4]*norm;
   double num_HeatCapacity = (E2average - Eaverage*Eaverage)/(temp*temp);
   double num_Susceptibility = (M2average - Mabsaverage*Mabsaverage)/((double) temp);
   // all expectation values are per spin, divide by 1/n_spins/n_spins

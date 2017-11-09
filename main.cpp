@@ -33,6 +33,7 @@
 //#include "lib.h"
 using namespace std;
 ofstream ofile;
+ofstream outfile;
 
 //Inline function for periodic boundary conditions:
 inline int periodic(int i, int limit, int add){
@@ -53,7 +54,7 @@ void read_input(int&, int&, double&, double&, double&); //Bruker ikke denne
 
 void initialize(int n_spins, double temp, int **spin_matrix, double &E, double &M);
 
-void Metropolis(int, int&, int**, double&, double&, double *, vector <int>, int);
+void Metropolis(int, int&, int**, double&, double&, double *, vector <int>&, int&);
 
 // prints to file the results of the calculations
 void output(int, int, double, double *, vector <double>, vector <double>);
@@ -78,20 +79,21 @@ int main(){
     //MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
 
     //char *outfilename;
+    double k = 1;
     double temp = 1.;
     double initial_temp = 1.;
     double final_temp = 3.;
     double temp_step = 0.2;
-    double beta = 1./temp;  //1/kT med k=1
+    double beta = 1./(k*temp);  //1/kT med k=1
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
-    int n_spins = 2; //Antall spins i én retning
+    int n_spins = 20; //Antall spins i én retning
     int accepted_configs = 0;
     cout << "Spins in each direction: " << n_spins << endl;
-    int mcs = 10000; //antall monte carlo cycles should be a billion?
+    int mcs = 100000; //antall monte carlo cycles should be a billion?
     int mc_counter = 0;
-    int config_counter = 0;
     double w[17], average[5], E, M; //w inneholder dE-verdier, average er forventningsverdiene
     double Z = 12 + 2*exp(8*beta) + 2*exp(-8*beta); //For 2x2-lattice
+    int multiplicity = pow(2, (n_spins*n_spins));
     vector <double> E_vec(mcs);
     vector <double> absM_vec(mcs);
     vector <int> accepted_configs_vec(mcs);
@@ -115,10 +117,10 @@ int main(){
     cout << "Analytical susceptibility: " << analytic_Susceptibility << endl;
     cout << "Analytical heat capacity: " << analytic_HeatCapacity << endl;
 
-
     //outfilename = "output.txt";
     //Open file for writing
-    ofile.open("output.txt");
+    ofile.open("output.txt"); //File for energy and magnetization
+    outfile.open("configs.txt"); //File for number of accepted configs
 
     // broadcast to all nodes common variables
     //MPI_Bcast (&n_spins, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -141,11 +143,9 @@ int main(){
     //Initialize array for expectation values:
     for (int i = 0; i < 5; i++) average[i] = 0.; //Setter alle elementer lik null. [E, E^2, M, M^2, abs(M)]
 
-
-
     initialize(n_spins, temp, spin_matrix, E, M); //Kaller initialize
     //Start Monte Carlo computation:
-    for (int cycles = 1; cycles <= mcs; cycles++){
+    for (int cycles = 0; cycles < mcs; cycles++){
         Metropolis(n_spins, accepted_configs, spin_matrix, E, M, w, accepted_configs_vec, mc_counter);
         //Update expectation values:
         average[0] += E; average[1] += E*E;  //average is expectation values. I c) vil jeg plotte E jeg faar etter hver sweep gjennom lattice mot mcs
@@ -155,11 +155,19 @@ int main(){
         //cout << E_vec[cycles] << endl;
     }
 
+    cout << endl;
+
+    for (int i=0; i < mcs; i++){
+        outfile << accepted_configs_vec[i] << endl; //Writing number of accepted configs to file
+    }
+
     //Print results:
     output(n_spins, mcs, temp, average, E_vec, absM_vec); //temp er kalt temperature i Mortens program
 
     //free_matrix((void **) spin_matrix ); //free memory
-    ofile.close(); //close output file
+    ofile.close(); //close output file (inneholder energier + magnetisering)
+    outfile.close(); //contains number of accepted configs
+
 
     //Skriver ut:
     cout << "Temperatur: " << temp << endl;
@@ -223,7 +231,7 @@ void output(int n_spins, int mcs, double temp, double *average, vector <double> 
 
   //Writing E- and M-values to file:
   for (int i =0; i < mcs; i++){
-      ofile << E_vec[i] << "  " << absM_vec[i] << endl; //1 column: E, 2 column: abs(M)
+      ofile << E_vec[i] << "  " << absM_vec[i]/(n_spins*n_spins) << endl; //1 column: E, 2 column: abs(M)
       //ofile << absM_vec[i] << endl;
   }
 
@@ -238,14 +246,14 @@ void output(int n_spins, int mcs, double temp, double *average, vector <double> 
 } // end output function
 
 //Function that performs the Metropolis algo:
-void Metropolis(int n_spins, int& accepted_configs, int **spin_matrix, double & E, double & M, double *w, vector <int> accepted_configs_vec, int mc_counter){
+void Metropolis(int n_spins, int& accepted_configs, int **spin_matrix, double & E, double & M, double *w, vector <int>& accepted_configs_vec, int& mc_counter){
     //Loop over all spins:
     for (int y = 0; y < n_spins; y++){
         for (int x = 0; x < n_spins; x++){  //For a 20x20 lattice we pick 400 random positions per mc cycle
             //find random position:
             int ix = (int) (rrandom() * n_spins); //Random x and y which means a random spin is picked
             int iy = (int) (rrandom() * n_spins);
-            //Calculate energy difference: (likn 13.6 i forel notater) of this spin
+            //Calculate energy difference: (likn 13.6 i forel notater) of total spin config compared to the last spin config(before the flip)
             int deltaE = 2*spin_matrix[iy][ix] *
             (spin_matrix[iy][periodic(ix, n_spins, -1)] +
             spin_matrix[periodic(iy, n_spins, -1)][ix] +
@@ -259,12 +267,13 @@ void Metropolis(int n_spins, int& accepted_configs, int **spin_matrix, double & 
                 M += (double) 2*spin_matrix[iy][ix];
                 E += (double) deltaE;
                 accepted_configs += 1; //Counts the accepted configs
-                accepted_configs_vec[mc_counter] = accepted_configs;
 
             }
         }
     }
+    accepted_configs_vec[mc_counter] = accepted_configs;
     mc_counter +=1;
+
     //return accepted_configs_vec;
 }//End Metropolis function (Metropolis sampling over spins)
 

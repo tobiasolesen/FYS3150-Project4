@@ -53,7 +53,7 @@ void read_input(int&, int&, double&, double&, double&); //Bruker ikke denne
 
 void initialize(int n_spins, double temp, int **spin_matrix, double &E, double &M);
 
-void Metropolis(int, int&, int**, double&, double&, double *, vector <int>);
+void Metropolis(int, int&, int**, double&, double&, double *, vector <int>, int);
 
 // prints to file the results of the calculations
 void output(int, int, double, double *, vector <double>, vector <double>);
@@ -84,10 +84,12 @@ int main(){
     double temp_step = 0.2;
     double beta = 1./temp;  //1/kT med k=1
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
-    int n_spins = 20; //Antall spins i én retning
-    //int accepted_configs = 0;
+    int n_spins = 2; //Antall spins i én retning
+    int accepted_configs = 0;
     cout << "Spins in each direction: " << n_spins << endl;
-    int mcs = 50; //antall monte carlo cycles should be a billion?
+    int mcs = 10000; //antall monte carlo cycles should be a billion?
+    int mc_counter = 0;
+    int config_counter = 0;
     double w[17], average[5], E, M; //w inneholder dE-verdier, average er forventningsverdiene
     double Z = 12 + 2*exp(8*beta) + 2*exp(-8*beta); //For 2x2-lattice
     vector <double> E_vec(mcs);
@@ -144,7 +146,7 @@ int main(){
     initialize(n_spins, temp, spin_matrix, E, M); //Kaller initialize
     //Start Monte Carlo computation:
     for (int cycles = 1; cycles <= mcs; cycles++){
-        Metropolis(n_spins, accepted_configs, spin_matrix, E, M, w, accepted_configs_vec);
+        Metropolis(n_spins, accepted_configs, spin_matrix, E, M, w, accepted_configs_vec, mc_counter);
         //Update expectation values:
         average[0] += E; average[1] += E*E;  //average is expectation values. I c) vil jeg plotte E jeg faar etter hver sweep gjennom lattice mot mcs
         average[2] += M; average[3] += M*M; average[4] += fabs(M);
@@ -162,7 +164,6 @@ int main(){
     //Skriver ut:
     cout << "Temperatur: " << temp << endl;
     cout << "Antall Monte Carlo cycles: " << mcs << endl;
-    cout << "Antall aksepterte konfigs: " << accepted_configs << endl;
 
     return 0;
 
@@ -194,24 +195,6 @@ void initialize(int n_spins, double temp, int **spin_matrix, double& E, double& 
         }
     }
 }//End function initialize
-/*
-// read in input data
-void read_input(int& n_spins, int& mcs, double& initial_temp,
-        double& final_temp, double& temp_step)
-{
-  cin >> mcs;
-  cout << "Number of Monte Carlo trials =";
-  //cin >> mcs;
-  cout << "Lattice size or number of spins (x and y equal) =";
-  cin >> n_spins;
-  cout << "Initial temperature with dimension energy=";
-  cin >> initial_temp;
-  cout << "Final temperature with dimension energy=";
-  cin >> final_temp;
-  cout << "Temperature step with dimension energy=";
-  cin >> temp_step;
-} // end of function read_input
-*/
 
 //Calculates and prints numerical values:
 void output(int n_spins, int mcs, double temp, double *average, vector <double> E_vec, vector <double> absM_vec)
@@ -255,11 +238,10 @@ void output(int n_spins, int mcs, double temp, double *average, vector <double> 
 } // end output function
 
 //Function that performs the Metropolis algo:
-void Metropolis(int n_spins, int& accepted_configs, int **spin_matrix, double & E, double & M, double *w, vector <int> accepted_configs_vec){
-    int count = 0;
+void Metropolis(int n_spins, int& accepted_configs, int **spin_matrix, double & E, double & M, double *w, vector <int> accepted_configs_vec, int mc_counter){
     //Loop over all spins:
     for (int y = 0; y < n_spins; y++){
-        for (int x = 0; x < n_spins; x++){
+        for (int x = 0; x < n_spins; x++){  //For a 20x20 lattice we pick 400 random positions per mc cycle
             //find random position:
             int ix = (int) (rrandom() * n_spins); //Random x and y which means a random spin is picked
             int iy = (int) (rrandom() * n_spins);
@@ -277,13 +259,13 @@ void Metropolis(int n_spins, int& accepted_configs, int **spin_matrix, double & 
                 M += (double) 2*spin_matrix[iy][ix];
                 E += (double) deltaE;
                 accepted_configs += 1; //Counts the accepted configs
-                //count += 1;
-                accepted_configs_vec[count] = accepted_configs;
+                accepted_configs_vec[mc_counter] = accepted_configs;
 
             }
         }
     }
-    count +=1;
+    mc_counter +=1;
+    //return accepted_configs_vec;
 }//End Metropolis function (Metropolis sampling over spins)
 
 //Function that calculates analytic average energy

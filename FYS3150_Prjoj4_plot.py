@@ -43,6 +43,7 @@ for line in E_file:
 E_file.close()
 
 mcs = count/len(T_values) #Oppg e)
+print "mcs:", mcs
 #T_end = T_values[-1]
 T_end = 2.5
 T = linspace(0, T_end, mcs)
@@ -86,7 +87,7 @@ legend_skrift = "T ="
     
 for i in range(len(T_values)):
     print i
-    plot( T, E[(i)*mcs:((i+1)*mcs)], label= (legend_skrift, T_values[i]) )
+    plot( T, E[(i)*mcs:((i+1)*mcs)], label= (legend_skrift, T_values[i]) ) #Plot energy per spin
     
 #for T in T_values:
 #    plot(T, E[:mcs]/(n_spins**2))    

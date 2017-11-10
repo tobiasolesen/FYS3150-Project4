@@ -93,7 +93,7 @@ int main(int argc, char* argv[]){
     //int ** spin_matrix, n_spins, mcs; //Matrise med alle spins (verdier +1 eller -1), antall spins i én retning, antall monte carlo cycles
     int n_spins = 40; //Antall spins i én retning
     int accepted_configs = 0;
-    int mcs = 1000; //antall monte carlo cycles should be a billion?
+    int mcs = 10000; //antall monte carlo cycles should be a billion?
     int mc_counter = 0;
     //int my_rank, numprocs;
     double w[17], average[5], total_average[5], E, M; //w inneholder dE-verdier, average er forventningsverdiene
@@ -256,7 +256,7 @@ void output(int n_spins, int mcs, double temp, double *average, double *total_av
   //Writing E- and M-values to file:
   //ofile << "Temp         E        M" << endl;
   for (int i =0; i < mcs; i++){
-      ofile << temp << "  " << E_vec[i] << "  " << absM_vec[i]/(n_spins*n_spins) << endl; //1 column: temp, 2 column: E, 3 column: abs(M)
+      ofile << temp << "  " << E_vec[i] << "  " << absM_vec[i]/(n_spins*n_spins) << "  " << num_HeatCapacity << "  " << num_Susceptibility << endl; //1 column: temp, 2 column: E, 3 column: abs(M), Cv, susceptibility
       //ofile << absM_vec[i] << endl;
   }
 

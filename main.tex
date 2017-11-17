@@ -215,7 +215,6 @@ I refer to temperature as T and number of Monte Carlo cycles as mcs.\newline
 }\newline
 \end{center}
 
-
 %Analytiske forventningsverdier tabell:
 \textbf{Oppg a: Table 2(below): Analytical expectation values for the 2x2 case with T=1}
 \newline
@@ -281,35 +280,30 @@ I refer to temperature as T and number of Monte Carlo cycles as mcs.\newline
 
 \begin{figure}[h!]
   \centering
-  \caption{Oppg c:Plot of accepted configurations vs mcs, for T = 1 and mcs = 500000. 20x20 spins and a random starting configuration}
+  \caption{Oppg c:Plot of accepted configurations vs mcs, for T = 1.0 and mcs = 1000, 20x20 spins and an ordered starting configuration}
   \includegraphics[width=10cm]{configs_plot_1.png}
 \end{figure}
 
 \begin{figure}[h!]
   \centering
-  \caption{Oppg c: Plot of accepted configurations vs mcs, for T = 1 and mcs = 2000. 20x20 spins and a random starting configurations}
+  \caption{Oppg c: Plot of accepted configurations vs mcs, for T = 2.4 and mcs = 1000. 20x20 spins and an ordered starting configuration}
   \includegraphics[width=10cm]{configs_plot_2.png}
 \end{figure}
 
 \begin{figure}[h!]
   \centering
-  \caption{Oppg c: Plot of accepted configurations vs mcs, for T = 2.4 and mcs = 500000 and 20x20 spins and a random starting configuration.}
+  \caption{Oppg c: Plot of accepted configurations vs mcs, for T = 1.0 and mcs = 1000, 20x20 spins and a random starting configuration.}
   \includegraphics[width=10cm]{configs_plot_3.png}
 \end{figure}
-
-\begin{figure}[h!]
-  \centering
-  \caption{Oppg c:Plot of accepted configurations vs mcs, for T = 1 and mcs = 1000. 20x20 spins and an ordered starting configuration. For higher mcs the function will also here look linear.}
-  \includegraphics[width=10cm]{configs_plot_4.png}
-\end{figure}
-
-\newpage
-
 \newpage
 
 \newpage
 
 \centering\subsection{Energy and magnetization plots}
+
+\newpage
+
+\newpage
 
 \begin{figure}[h!]
   \centering
@@ -334,6 +328,8 @@ I refer to temperature as T and number of Monte Carlo cycles as mcs.\newline
   \caption{Oppg c: Plot of energy and magnetization as function of mcs, for T=2.4 and 20x20 spins with an ordered starting configuration}
   \includegraphics[width=10cm]{E_M_plot_c_4.png}
 \end{figure}
+
+\centering\subsection{Plots of probability functions}
 
 \begin{figure}[H]
   \centering
@@ -381,9 +377,13 @@ For T=1 and a random starting configuration of spins, both the energy and magnet
 It is clear from the plots that both the energy and magnetization fluctuates much more and uses longer time to reach the steady state with a higher temperature T=2,4. This makes sense though, because with higher energy comes higher multiplicity: When the temperature increases, the Boltzmann factor allows me to access more states, which increases the probability of accessing other states.\newline
 It's easy to see from figures 5 and 6 that with lower temperature, it's much "easier" for the system to reach equilibrium. \newline
 
-See that for T = 1, the number of accepted configurations increase greatly in the beginning, bu then flattens out a bit.
-For a high number of monte carlo cycles, the graph looks like a linear function.
-See that for higher temperatures (T = 2.4), the number of accepted configurations are a pretty linear function of the number of Monte Carlo cycles almost from the start. As one can see from figure ?, the number of configurations doesn't flatten out as it does for T = 1. Note that the two configuration plots in figure 2 and 3 are for a random starting configuration.\newline
+In figures 2-4 I have plotted the number off accepted configurations versus the number of monte carlo cycles. By studying figure 4 I see that for a random starting configuration and T = 1, the number of accepted configurations increase greatly in the beginning, but then flattens out at around the 250th mc-cycle. The point where the graph flattens out is the point where the system reaches thermal equilibrium. At this point the system has reached the low energy that it 'wants', as per the principle of energy minimization and equations (1) and (4). This statement is in agreement with the probabilities plotted in figure 9: Here it is evident that the most likely state is by far the ground state, which has the least energy and where the spins are ordered. So the system in figure 4 goes from a random configuration to a more ordered configuration. When the system has reached the steady state, the rate at which new configurations are accepted will slow down and then stay constant. This is because the ground state is overwhelmingly likely compared to any other states at this point.\newline
+
+How an increase in temperature affects the probability distribution of states is evident from figures 9-11, which all illustrates the system with a random initial configuration. The increase in temperature causes an increase in the width of the distribution function, which means that the probabilities are more 'spread out' between the different states.\newline
+
+Comparing figure 2 and 3 is also an interesting exercise. Both these systems have an ordered spin configuration initially, so the only difference between the two plots are the temperature. It is easy to see that for the higher temperature T=2.4, the number of accepted configurations increases much faster than for T=1. This is what one would expect from equations (1) and (4):
+Most states now have a more equal probability (as mentioned in my discussion of figures 9-11), and the entropy-term in equation (1) increases.\newline
+In general, it takes shorter time for a system to go from an ordered to unordered state, than the other way around.\newline
 
 \subsection{The probability distribution}
 

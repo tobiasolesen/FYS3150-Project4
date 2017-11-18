@@ -2,6 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{enumerate}
 \usepackage{amsmath}
+\usepackage{mathtools}
 \usepackage{graphicx}
 \usepackage{listings}
 \linespread{1.05}
@@ -56,7 +57,7 @@ The point where a phase transition takes place is called a critical point and th
     F = \langle E \rangle - TS = - k_B TlnZ
 \end{equation}
 where Z is the partition function of the system, T is the temperature, $k_B$ is the Boltzmann constant and S is the entropy. For simplification I will in the whole project use $k_B = 1$. This expression for F shows in a very clear way the 'struggle' between rise in entropy (from the second law of thermodynamics) and the principle of energy minimization.\newline
-Then the specific heat $C_V$ is defined via the second derivative of F: $C_V = - \frac{1}{k_B T^2}\frac{\partial^2(\beta F)}{\partial \beta ^2}$, where $\beta = \frac{1}{k_B T}$. The Ising model exhibits a second order phase transition since the heat capacity diverges. The same goes for the magnetic susceptibility $\chi$.\newline
+Then the specific heat $C_V$ is defined via the second derivative of F: $C_V = - \frac{1}{k_B T^2}\frac{\partial^2(\beta F)}{\partial \beta ^2}$, where $\beta = \frac{1}{k_B T}$. The Ising model exhibits a second order phase transition since the heat capacity diverges. The same goes for the magnetic susceptibility $\chi$. $\chi$ can also be expressed as a second order derivative of F, and it too will diverge at the critical point.\newline
 $C_V$ is the heat needed to be added to (or removed from) a system to cause a given temperature change, while $\chi$ describes a material's response to an applied magnetic field. Both $C_V$ and $\chi$ will be affected when $T_C$ is reached.
 
 \subsection{Monte Carlo methods}
@@ -117,11 +118,15 @@ Then I can find an expression for the partition function Z for the 2x2 case from
 $\langle E \rangle$ and $\langle E^2 \rangle$ is found from equation (5) and (6) respectively:
 
 \begin{equation}
-    \langle E \rangle = \frac{1}{Z}\sum_{i=1}^{\Omega}E_i e^{-\beta E_i} = \frac{1}{Z}(16e^{-8\beta} - 16e^{8\beta}) = -\frac{32}{Z}\sinh(8\beta)
+\begin{multlined}
+    \langle E \rangle = \frac{1}{Z}\sum_{i=1}^{\Omega}E_i e^{-\beta E_i}\\ = \frac{1}{Z}(16e^{-8\beta} - 16e^{8\beta}) = -\frac{32}{Z}\sinh(8\beta)
+\end{multlined}
 \end{equation}
 
 \begin{equation}
-    \langle E^2 \rangle = \frac{1}{Z}\sum_{i=1}^{\Omega}{E_i}^2 e^{-\beta E_i} = \frac{1}{Z}( 128e^{8\beta} + 128e^{-8\beta} ) = \frac{256}{Z}\cosh(8\beta)
+\begin{multlined}
+    \langle E^2 \rangle = \frac{1}{Z}\sum_{i=1}^{\Omega}{E_i}^2 e^{-\beta E_i}\\ = \frac{1}{Z}( 128e^{8\beta} + 128e^{-8\beta} ) = \frac{256}{Z}\cosh(8\beta)
+\end{multlined}
 \end{equation}
 
 where I have used that $cosh(x)=\frac{e^x + e^{-x}}{2}$ and $sinh(x)=\frac{e^x - e^{-x}}{2}$.
@@ -166,7 +171,12 @@ The Metropolis algorithm goes as follows:\newline
 8. The steps 2 - 7 are then repeated in order to obtain a sufficiently good representation of states.\newline
 
 Each sweep through the lattice (sum over all spins) constitutes a Monte Carlo cycle. One cycle can be thought of as a measurement. In the end I will divide the various expectation values with number of cycles to 'eliminate' the number of cycles as a factor in the calculations. I will also divide all results by the number of spins.\newline
-The energy difference between two states is given by: $$\Delta E = E_{new} - E_0 = J \sum_{<kl>}^{N} s_{k,1}s_{l,1} - J\sum_{<kl>}^{N} s_{k,2}s_{l,2} = - J\sum_{<kl>}^{N} ??$$ which can be rewritten as: $$\Delta E = -J \sum_{<kl>}^{N} s_{k,2}() $$ ???\newline
+The energy difference between two states is given by:
+\begin{equation}
+\begin{multlined}
+\Delta E = E_{new} - E_0 = J \sum_{<kl>}^{N} s_{k,1}s_{l,1} - J\sum_{<kl>}^{N} s_{k,2}s_{l,2}\\ = -J \sum_{<kl>}^{N} s_{k,2}(s_{l,2} - s_{l,1})
+\end{multlined}
+\end{equation}
 
 My numerical results for the relevant parameters in the 2x2 case are listed in tables 3-5, and the analytical results are listed in table 2.
 \newline
@@ -175,7 +185,20 @@ The number of accepted configurations is plotted by counting every time the requ
 
 To see the distribution between the different microstates in my system I also plot the probability of a given state occuring, as a function of the associated discrete energy of the state. This is shown in figures 11-14. I find the probabilities by simply counting the times a spesific energy occurs in my simulation, and then dividing by the total number of possible energies.\newline
 
-I also want to study the behaviour of the Ising model close to the  critical temperature. This is done by plotting all the relevant parameters $\langle E \rangle$, $\langle |M| \rangle$, $\chi$ and $C_V$ as a function of temperature, for T $\epsilon[2.1, 2.4]$. These results are shown in figures ??.
+I also want to study the behaviour of the Ising model close to the  critical temperature. This is done by plotting all the relevant parameters $\langle E \rangle$, $\langle |M| \rangle$, $\chi$ and $C_V$ as functions of temperature, for T $\epsilon[2.1, 2.4]$ with a temperature step of 0.05, and for different lattice sizes L. These plots are shown in figures ??.\newline
+
+From this these results it is possible to read the critical temperatures $T_C(L)$ directly of the plots because the divergence of $C_V$ and $\chi$ at the critical point will be visible in the plots as a discontinuity in the functions.\newline
+This makes me able to determine the critical temperature in the thermodynamic limit $L \rightarrow \infty$ from the equation below:
+\begin{equation}
+    T_C(L) - T_C(L=\infty) = aL^{-1/\nu}
+\end{equation}
+which gives:
+\begin{equation}
+    T_C(L=\infty) = T_C(L) - \frac{a}{L}
+\end{equation}
+where I have used that $\nu = 1$.\newline
+
+The "eye-balling" method for determining $T_C$ is probably not the most accurate though. A better way may be to extract the critical temperatures for each of the lattice sizes numerically, and then plot them with a linear regression as done in figure 12. Because my units on the x-axis here is 1/L, the approximation of the critical temperature in the thermodynamic limit is simply equal to the point where the linear function intersects with the y-axis.
 
 \section{IMPLEMENTATION}
 My code is available at my Github adress:\newline
@@ -351,11 +374,9 @@ I refer to temperature as T and number of Monte Carlo cycles as mcs.\newline
 
 \begin{figure}[h!]
   \centering
-  \caption{Oppg f: Linear regression over $T_C$-values, for T$\epsilon$[2.1, 2.4], mcs = 1000000 and 20x20 spins with a random starting configuration.}
+  \caption{Oppg f: Linear regression over $T_C$-values, for T$\epsilon$[2.1, 2.4], mcs = 1000000 and a random starting configuration.}
   \includegraphics[width=10cm]{Proj4_f_linear_plot.png}
 \end{figure}
-
-From the plot in figure 14 I see that the (approximation of) $T_C(L=\infinity) = 2.2322$, which isn't that far away from the exact result from Lars Onsager: 2.269.
 
 \newpage
 \newpage
@@ -394,6 +415,8 @@ With the above paragraph in mind, it would then be interesting to lower the temp
 With a temperature T = 2.0, the variance for this case is: $\sigma_E^2$ = 1159.75, which gives a standard deviation of: $\sigma = 34.06$. If I measure by eye the FWHM of the plot in figure 13, I find a width of about 50. This shows a much better agreement, and is as expected.\newline
 
 What has been talked about in the earlier paragraphs and what one can see from both the probability distribution plots and the plots of the expectation values for E and M, is physics governed by the Boltzmann distribution function given in equation (3).\newline
+
+From the plot in figure 14 I see that (the approximation of) $T_C(L=\infty) = 2.2322$, which isn't that far away from the exact result from Lars Onsager: 2.269.\newline
 
 It is also worth mentioning that there exists a correlation between the different spin configurations (microstates) because I only flip one single spin at a time (each time I change the configuration). This correlation shouldn't be too big though, because I still end up flipping $L^2$ spins per Monte Carlo cycle.\newline
 
